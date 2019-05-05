@@ -18,13 +18,41 @@ using MediaBrowser.Model.LiveTv;
 
 namespace MediaBrowser.Plugins.NextPvr
 {
-    public class RecordingsChannel : IChannel, IHasCacheKey, ISupportsDelete, ISupportsLatestMedia, ISupportsMediaProbe, IHasFolderAttributes
+    public class RecordingsChannel : IChannel, IHasCacheKey, ISupportsDelete, ISupportsLatestMedia, ISupportsMediaProbe, IHasFolderAttributes, IHasChangeEvent, IDisposable
     {
         public ILiveTvManager _liveTvManager;
+
+        public event EventHandler ContentChanged;
+        private Timer _updateTimer;
+
+        public void OnContentChanged()
+        {
+            if (ContentChanged != null)
+            {
+                ContentChanged(this, EventArgs.Empty);
+            }
+        }
+
+        private void OnUpdateTimerCallback(object state)
+        {
+            OnContentChanged();
+        }
 
         public RecordingsChannel(ILiveTvManager liveTvManager)
         {
             _liveTvManager = liveTvManager;
+
+            var interval = TimeSpan.FromMinutes(15);
+            _updateTimer = new Timer(OnUpdateTimerCallback, null, interval, interval);
+        }
+
+        public void Dispose()
+        {
+            if (_updateTimer != null)
+            {
+                _updateTimer.Dispose();
+                _updateTimer = null;
+            }
         }
 
         public string Name
@@ -47,7 +75,7 @@ namespace MediaBrowser.Plugins.NextPvr
         {
             get
             {
-                return new []{ "Recordings" };
+                return new[] { "Recordings" };
             }
         }
 
@@ -152,14 +180,6 @@ namespace MediaBrowser.Plugins.NextPvr
         {
             return GetService().DeleteRecordingAsync(id, cancellationToken);
         }
-
-        public async Task<IEnumerable<ChannelItemInfo>> GetLatestMedia(ChannelLatestMediaSearch request, CancellationToken cancellationToken)
-        {
-            var result = await GetChannelItems(new InternalChannelItemQuery(), i => true, cancellationToken).ConfigureAwait(false);
-
-            return result.Items.OrderByDescending(i => i.DateCreated ?? DateTimeOffset.MinValue);
-        }
-
         public Task<ChannelItemResult> GetChannelItems(InternalChannelItemQuery query, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(query.FolderId))
