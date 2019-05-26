@@ -143,7 +143,7 @@ namespace MediaBrowser.Plugins.NextPvr
 
         public string GetMd5Hash(string value)
         {
-            var hashValue = _cryptoProvider.ComputeMD5(new UTF8Encoding().GetBytes(value));
+            var hashValue = _cryptoProvider.ComputeMD5(new UTF8Encoding().GetBytes(value).AsSpan()).ToArray();
             //Bit convertor return the byte to string as all caps hex values seperated by "-"
             return BitConverter.ToString(hashValue).Replace("-", "").ToLowerInvariant();
         }
